@@ -23,6 +23,7 @@ class RecurrenceRelation(object):
         self._closedForm = None
         self._logger = logging.getLogger(__name__)
 
+
     def _solve(self):
         """
         Solve the recurrence relation into a closed form

@@ -3,7 +3,7 @@ import glob
 import os.path
 import re
 
-from .RecurrenceRelation import RecurrenceRelation
+from . import RecurrenceRelation
 
 
 class RecurrenceRelationParser(object):
@@ -42,8 +42,13 @@ class RecurrenceRelationParser(object):
                     n, data)
                 self._logger.warning(msg)
 
+            if n.isdigit():
+                n = int(n)
+
             # Remove the leading s defintion and the comma at the end
             parsed[n] = line[6:].strip().rstrip(",")
+            # replace ^ with **
+            parsed[n] = re.sub('^', '**', parsed[n])
 
         # remove the recurrence from the dictionary
         # and create a RecurrenceRelation object

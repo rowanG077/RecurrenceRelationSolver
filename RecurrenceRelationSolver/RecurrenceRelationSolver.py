@@ -7,7 +7,7 @@ import os.path
 import os
 import errno
 
-from .RecurrenceRelationParser import RecurrenceRelationParser
+from . import RecurrenceRelationParser
 
 
 def main():
@@ -45,6 +45,7 @@ def main():
         _, fn = os.path.split(path)
         with open(path, "r") as f:
             relations[fn] = recurrenceParser.parse_recurrence(f.read())
+
 
     # Maybe check equation here?
 

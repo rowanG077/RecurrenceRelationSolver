@@ -11,7 +11,7 @@ with open('LICENSE') as f:
     license = f.read()
 
 setup(
-    name='RecurrenceRelationSolved',
+    name='RecurrenceRelationSolver',
     version='0.1.0',
     description='Solves recurrence relation into a closed form',
     long_description=readme,
@@ -19,5 +19,10 @@ setup(
     author_email='rgoemans@science.ru.nl',
     url='https://github.com/rowanG077/RecurrenceRelationSolver',
     license=license,
-    packages=find_packages(exclude=('tests'))
+    packages=find_packages(exclude=('tests')),
+    entry_points={
+        'console_scripts': [
+        'recurrenceSolver=RecurrenceRelationSolver.RecurrenceRelationSolver'
+        ]
+    },
 )
