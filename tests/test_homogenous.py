@@ -10,7 +10,8 @@ class HomogeneousTestSuite(unittest.TestCase):
 
     def setUp(self):
         self.parser = RecurrenceRelationParser()
-        self.verifyUpto = 100
+        self.verifyUpto = 50
+        self.deviation = 1.0 / 100.0
 
     def test_comass03(self):
         recurrence = """
@@ -22,7 +23,7 @@ class HomogeneousTestSuite(unittest.TestCase):
             ];
         """
         relation = self.parser.parse_recurrence(recurrence)
-        assert relation.verify_upto(self.verifyUpto)
+        relation.verify_range(self.verifyUpto, self.deviation)
 
     def test_comass07(self):
         recurrence = """
@@ -34,7 +35,7 @@ class HomogeneousTestSuite(unittest.TestCase):
             ];
         """
         relation = self.parser.parse_recurrence(recurrence)
-        assert relation.verify_upto(self.verifyUpto)
+        relation.verify_range(self.verifyUpto, self.deviation)
 
 
 if __name__ == '__main__':

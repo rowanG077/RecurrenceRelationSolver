@@ -48,6 +48,8 @@ def main():
 
 
     # Maybe check equation here?
+    for _, r in relations.items(): 
+        r.verify_range(10, 0.005)
 
     # Write solved relations to output directory
     for fn, r in relations.items():
