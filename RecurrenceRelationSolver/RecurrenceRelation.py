@@ -196,6 +196,51 @@ class RecurrenceRelation(object):
                 nonHomogenous += arg
         return degree, homogenous, nonHomogenous, linear
 
+    def _getDirectKey(self,expr):
+        s = self._sympy_context["s"]
+        #this is still way to hacky, maybe we have to check per step if we can do it or not...
+        if expr.func == s:
+            return expr.args[0].args[0]
+        elif expr.args[1].func == s:
+            return expr.args[1].args[0].args[0]
+        else:
+            #TODO I'd say
+            return "error"
+
+
+    def _dictBuilder (self,expr,dicts):
+        s = self._sympy_context["s"]
+        #if the function has an add, it means we can loop deeper
+        if expr.func == sympy.Add :
+            for arg in expr.args:
+                self._dictBuilder(arg,dicts)
+        elif expr.func == sympy.Mul:
+            #we always get the value from a multiply function
+            dicts[self._getDirectKey(expr)] =  expr.args[0]
+        elif expr.func == s:
+            #if we found the function directly, it means there is no extra mul, so we have a constant of 1
+            dicts[self._getDirectKey(expr)] =  1
+        else:
+            print("else")
+            #it seems that we get here if there is #no-homo
+        return
+
+    def _charEq(self):
+        """
+        Get the characteristic function with a given degree
+        """    
+        r = sympy.Symbol('r')
+
+        #build the dictionary where we link every constant to every a_n value
+        dicts = {}
+        self._dictBuilder(self._recurrence,dicts)
+
+        #start building our new expression!
+        newExpr = r**self._degree
+        for i in range(1,self._degree+1):
+            newExpr = newExpr - dicts.get(-i,0) * r**(self._degree-i)
+    
+        return newExpr
 
     def _solve(self):
         """
@@ -209,6 +254,11 @@ class RecurrenceRelation(object):
         if not linear:
             msg = "The equation is not linear"
             raise RecurrenceSolveFailed(msg)
+
+        #if nonHomogenous == 0:
+        a = self._charEq()
+        print(self._recurrence)
+        print(a)
 
         return "Solved"
 
