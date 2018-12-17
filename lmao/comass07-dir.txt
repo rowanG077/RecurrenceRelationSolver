@@ -1,1 +1,0 @@
-sdir := n -> Solved;

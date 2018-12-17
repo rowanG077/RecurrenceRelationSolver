@@ -1,6 +1,6 @@
+#!/usr/bin/env python3
+# coding=utf-8
 import logging
-import glob
-import os.path
 import re
 
 from . import RecurrenceRelation

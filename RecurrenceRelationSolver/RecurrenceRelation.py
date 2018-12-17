@@ -1,9 +1,8 @@
+#!/usr/bin/env python3
+# coding=utf-8
 import logging
-import glob
-import os.path
 import re
 import sympy
-from string import ascii_uppercase
 
 class RecurrenceVerificationFailed(Exception):
     """
@@ -45,7 +44,7 @@ class RecurrenceRelation(object):
         self._initialConditions = { k: self._to_sympy(v) for (k,v) in initialConditions.items() }
         
         # Solved values will be stored here in a bottom up dynamic programming manner
-        self._solvedValues = { k: self._to_sympy(v) for (k,v) in initialConditions.items() }
+        self._solvedValues = dict(self._initialConditions)
 
         # Contains the closed from as calculated by our own algorithm
         self._closedForm = None
