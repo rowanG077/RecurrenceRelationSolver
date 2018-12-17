@@ -81,6 +81,40 @@ class RecurrenceRelation(object):
 
         return re.sub("\*\*", "^", raw)
 
+    def analyseExpression(self, expr):
+
+        expandedTree = expr.expand()
+        homogenous = 0
+        nonHomogenous = 0
+        degree = 0
+        linear = True
+
+        s = self._sympy_context["s"]
+        n = self._sympy_context["n"]
+        i = sympy.Wild("i")
+
+        for arg in expandedTree.args:
+            if arg.has(s):
+                homogenous += arg
+                rec_term = str(arg.find(s(n-i)))
+                try:
+                    term_degree = int(re.search(r'\d+', rec_term).group())
+                    if term_degree > degree:
+                        degree = term_degree
+                    if linear and arg.has(sympy.Pow):
+                        linear = False
+                        break
+                    if linear and arg.func == sympy.Mul:
+                        s_args = arg.args
+                        if (s_args[0].has(s) or s_args[0].has(s)) and (s_args[1].has(s) or s_args[1].has(n)):
+                            linear = False
+                            break
+                except AttributeError:
+                    print("Failed parsing homogeneous term")
+            else:
+                nonHomogenous += arg
+        return degree, homogenous, nonHomogenous, linear
+
     def _solve(self):
         """
         Solve the recurrence relation into a closed form
@@ -88,6 +122,9 @@ class RecurrenceRelation(object):
         Returns:
             String: The solved recurrence relation in string format
         """
+        degree, homogenous, nonHomogenous, linear = self.analyseExpression(self._recurrence)
+        
+
         return "Solved"
 
     def solve(self):
