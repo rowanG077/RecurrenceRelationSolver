@@ -3,6 +3,7 @@
 import logging
 import re
 import sympy
+from sympy.solvers.solveset import linsolve
 
 class RecurrenceVerificationFailed(Exception):
     """
@@ -14,6 +15,18 @@ class RecurrenceVerificationFailed(Exception):
         create RecurrenceVerificationFailed object
         Args:
             reason (string): Where the verification failed
+        """
+        self.reason = reason
+
+class RecurrenceSolveFailed(Exception):
+    """
+    RecurrenceSolveFailed will be thrown when recurrence relation couldn't be solved fails
+    """
+    def __init__(self, reason):
+        """
+        create RecurrenceSolveFailed object
+        Args:
+            reason (string): Why the solve couldn't be performed
         """
         self.reason = reason
 
@@ -81,6 +94,74 @@ class RecurrenceRelation(object):
 
         return re.sub("\*\*", "^", raw)
 
+    def _getSolution(self, characteristicEq):
+        """
+        get the closed form equation given the characteristic equation.
+        Get the fucking shit
+
+        Args:
+            characteristicEq (sympy expression): The characteristic equation
+        
+        Returns:
+            sympy expression: The closed form solved
+        """
+        self._degree = 2
+        self._initialConditions = {
+            0: sympy.sympify(1),
+            1: sympy.sympify(10)
+        }
+        characteristicEq = sympy.sympify("r**2 - 10*r + 1", { "r": sympy.var("r") })
+
+        # get roots of characteristic equations and remove
+        # the complex roots
+        realRoots = { s:m for (s,m) in sympy.roots(characteristicEq).items() if sympy.I not in s.atoms() }
+        # the sum of the multiplicity must be the same as the degree
+        # else we can't solve the equation 
+
+        if sum(realRoots.values()) != self._degree:
+            msg = "The characteristic equation \"%s\" has the following real roots: %s, and the multiplicities is not the same as the degree" % (str(characteristicEq), str(realRoots))
+            raise RecurrenceSolveFailed(msg)
+
+        ctx = {
+            "n": sympy.var("n", integer = True)
+        }
+
+        # Generate general solution
+        generalSolutionTerms = []
+        for i, (s,m) in enumerate(realRoots.items()):
+            terms = []
+            for j in range(0, m):
+                varname = "p%d%d" % (i,j)
+                ctx[varname] = sympy.var(varname)
+                terms.append("(%s * n**%d)" % (varname, j))
+
+            generalSolutionTerms.append("(%s)*(%s)**n" % ("+".join(terms), str(s)))
+
+        rawGeneralSolution = '+'.join(generalSolutionTerms)
+
+        # Create system of equation using initial conditions
+        equations = []
+        for i,c in self._initialConditions.items():
+            raw = rawGeneralSolution + ("-(%s)" % str(c))
+            eq = sympy.sympify(raw, ctx).subs(ctx["n"], i)
+            equations.append(eq)
+        
+        # Solve the system of equation
+        solveSymbols = [ e for n, e in ctx.items() if n != "n" ]
+        solutions = linsolve(equations, solveSymbols)
+        
+        if len(solutions) == 0:
+            raise RecurrenceSolveFailed("No solution to the system of equations to find the alfas could be found.")
+
+        solution = list(solutions)[0]
+
+        # fill in the solution of the system
+        solved = sympy.sympify(rawGeneralSolution, ctx)
+        for symbol, sub in zip(solveSymbols, list(solution)):
+            solved = solved.subs(symbol, sub)
+
+        return solved
+
     def analyseExpression(self, expr):
 
         expandedTree = expr.expand()
@@ -115,6 +196,7 @@ class RecurrenceRelation(object):
                 nonHomogenous += arg
         return degree, homogenous, nonHomogenous, linear
 
+
     def _solve(self):
         """
         Solve the recurrence relation into a closed form
@@ -122,8 +204,11 @@ class RecurrenceRelation(object):
         Returns:
             String: The solved recurrence relation in string format
         """
-        degree, homogenous, nonHomogenous, linear = self.analyseExpression(self._recurrence)
-        
+        self._degree, homogenous, nonHomogenous, linear = self.analyseExpression(self._recurrence)
+
+        if not linear:
+            msg = "The equation is not linear"
+            raise RecurrenceSolveFailed(msg)
 
         return "Solved"
 
