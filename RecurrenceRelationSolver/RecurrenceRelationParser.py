@@ -46,10 +46,6 @@ class RecurrenceRelationParser(object):
             # we use integers as keys in a dict for the initial conditions
             if n.isdigit():
                 n = int(n)
-            # if it is not an initial condition we append -s(n) so we can an
-            # equal to 0
-            else:
-                eq += "-s(n)"
 
             # Remove the leading s defintion and the comma at the end
             parsed[n] = eq
