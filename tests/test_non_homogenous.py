@@ -55,6 +55,20 @@ class NonHomogeneousTestSuite(unittest.TestCase):
         relation = self.parser.parse_recurrence(recurrence)
         relation.verify_range(self.verifyUpto, self.deviation)
 
+    def test_Wim(self):
+            recurrence = """
+                eqs :=
+                [
+                s(n) = s(n-2) + 0.5*n^2+0.5*n,
+                s(0) = 0,
+                s(1) = 1
+                ];
+            """
+            relation = self.parser.parse_recurrence(recurrence)
+            relation.verify_range(self.verifyUpto, self.deviation)
+
+
+
 
 if __name__ == '__main__':
     unittest.main()
