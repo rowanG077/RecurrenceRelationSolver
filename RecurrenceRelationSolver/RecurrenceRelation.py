@@ -94,23 +94,16 @@ class RecurrenceRelation(object):
 
         return re.sub("\*\*", "^", raw)
 
-    def _getSolution(self, characteristicEq):
+    def _getGeneralSolution(self, characteristicEq):
         """
-        get the closed form equation given the characteristic equation.
-        Get the fucking shit
+        get the general solution given the characteristic equation.
 
         Args:
             characteristicEq (sympy expression): The characteristic equation
         
         Returns:
-            sympy expression: The closed form solved
+            sympy expression: The general solution
         """
-        self._degree = 2
-        self._initialConditions = {
-            0: sympy.sympify(1),
-            1: sympy.sympify(10)
-        }
-        characteristicEq = sympy.sympify("r**2 - 10*r + 1", { "r": sympy.var("r") })
 
         # get roots of characteristic equations and remove
         # the complex roots
@@ -137,14 +130,26 @@ class RecurrenceRelation(object):
 
             generalSolutionTerms.append("(%s)*(%s)**n" % ("+".join(terms), str(s)))
 
-        rawGeneralSolution = '+'.join(generalSolutionTerms)
 
-        # Create system of equation using initial conditions
+        return sympy.sympify('+'.join(generalSolutionTerms), ctx), ctx
+
+    def _calculateClosedFromGeneralSolution(self, generalSolution, ctx):
+        """
+        get the closed form equation for a general solution.
+
+        Args:
+            generalSolution (sympy expression): The general solution
+            ctx ((dict of string: sympy symbol):): The context of the general solution
+        
+        Returns:
+            sympy expression: The closed form solved
+        """
+
+        # Create system of equations using initial conditions
         equations = []
         for i,c in self._initialConditions.items():
-            raw = rawGeneralSolution + ("-(%s)" % str(c))
-            eq = sympy.sympify(raw, ctx).subs(ctx["n"], i)
-            equations.append(eq)
+            eq = generalSolution - sympy.sympify("(%s)" % str(c))
+            equations.append(eq.subs(ctx["n"], i))
         
         # Solve the system of equation
         solveSymbols = [ e for n, e in ctx.items() if n != "n" ]
@@ -156,15 +161,45 @@ class RecurrenceRelation(object):
         solution = list(solutions)[0]
 
         # fill in the solution of the system
-        solved = sympy.sympify(rawGeneralSolution, ctx)
+        solved = generalSolution
         for symbol, sub in zip(solveSymbols, list(solution)):
             solved = solved.subs(symbol, sub)
 
         return solved
 
-    def analyseExpression(self, expr):
+    def _solveNonHomogeneous(self, generalSolution, ctx):
+        """
+        get the closed form equation for a non-homogeneous recurrence relation
+        given the general solution for the associated homogeneous recurrence
 
-        expandedTree = expr.expand()
+        Args:
+            generalSolution (sympy expression): The general solution for the associated homogeneous recurrence
+            ctx ((dict of string: sympy symbol):): The context of the general solution
+        
+        Returns:
+            sympy expression: The closed form solved
+        """
+
+        solveableRecurrence = self._recurrence - sympy.sympify("s(n)", self._sympy_context)
+        # Guess an equation
+
+        particularSolution = sympy.solve(solveableRecurrence)
+        solution = particularSolution + generalSolution
+
+        return self._calculateClosedFromGeneralSolution(solution, ctx)
+
+    def _analyseExpression(self):
+        """
+        Analyse recurrence relation to determine certain properties
+        
+        Returns:
+            tuple(int, sympy expr, sympy expr, bool): Contains information from the expression
+                int: What degree the equation has
+                sympy expr: the homogeneous part of the equation
+                sympy expr: the non-homogeneous part of the equation
+                bool: whether the recurrence is linear or not
+        """
+
         homogenous = 0
         nonHomogenous = 0
         degree = 0
@@ -174,7 +209,7 @@ class RecurrenceRelation(object):
         n = self._sympy_context["n"]
         i = sympy.Wild("i")
 
-        for arg in expandedTree.args:
+        for arg in self._recurrence.args:
             if arg.has(s):
                 homogenous += arg
                 rec_term = str(arg.find(s(n-i)))
@@ -191,41 +226,37 @@ class RecurrenceRelation(object):
                             linear = False
                             break
                 except AttributeError:
-                    print("Failed parsing homogeneous term")
+                    raise RecurrenceSolveFailed("Failed parsing homogeneous term")
             else:
                 nonHomogenous += arg
+
         return degree, homogenous, nonHomogenous, linear
 
-    def _getDirectKey(self,expr):
+    def _getDirectKey(self, expr):
         s = self._sympy_context["s"]
-        #this is still way to hacky, maybe we have to check per step if we can do it or not...
+        # this is still way to hacky, maybe we have to check per step if we can do it or not...
         if expr.func == s:
             return expr.args[0].args[0]
         elif expr.args[1].func == s:
             return expr.args[1].args[0].args[0]
-        else:
-            #TODO I'd say
-            return "error"
 
 
-    def _dictBuilder (self,expr,dicts):
+    def _dictBuilder (self, expr, dicts):
         s = self._sympy_context["s"]
-        #if the function has an add, it means we can loop deeper
+        # if the function has an add, it means we can loop deeper
         if expr.func == sympy.Add :
             for arg in expr.args:
                 self._dictBuilder(arg,dicts)
         elif expr.func == sympy.Mul:
-            #we always get the value from a multiply function
+            # we always get the value from a multiply function
             dicts[self._getDirectKey(expr)] =  expr.args[0]
         elif expr.func == s:
-            #if we found the function directly, it means there is no extra mul, so we have a constant of 1
+            # if we found the function directly, it means there is no extra mul, so we have a constant of 1
             dicts[self._getDirectKey(expr)] =  1
-        else:
-            print("else")
-            #it seems that we get here if there is #no-homo
+ 
         return
 
-    def _charEq(self):
+    def _getCharacteristicEquation(self, expr):
         """
         Get the characteristic function with a given degree
         """    
@@ -233,12 +264,12 @@ class RecurrenceRelation(object):
 
         #build the dictionary where we link every constant to every a_n value
         dicts = {}
-        self._dictBuilder(self._recurrence,dicts)
+        self._dictBuilder(self._recurrence, dicts)
 
         #start building our new expression!
         newExpr = r**self._degree
-        for i in range(1,self._degree+1):
-            newExpr = newExpr - dicts.get(-i,0) * r**(self._degree-i)
+        for i in range(1, self._degree + 1):
+            newExpr = newExpr - dicts.get(-i, 0) * r**(self._degree - i)
     
         return newExpr
 
@@ -249,18 +280,21 @@ class RecurrenceRelation(object):
         Returns:
             String: The solved recurrence relation in string format
         """
-        self._degree, homogenous, nonHomogenous, linear = self.analyseExpression(self._recurrence)
+        self._degree, homogenous, nonHomogenous, linear = self._analyseExpression()
 
         if not linear:
-            msg = "The equation is not linear"
-            raise RecurrenceSolveFailed(msg)
+            raise RecurrenceSolveFailed("The equation is not linear")
 
-        #if nonHomogenous == 0:
-        a = self._charEq()
-        print(self._recurrence)
-        print(a)
+        characteristicEq = self._getCharacteristicEquation(homogenous)
+        generalSolution, ctx = self._getGeneralSolution(characteristicEq)
 
-        return "Solved"
+        solved = sympy.sympify("0")
+        if nonHomogenous == 0:
+            solved = self._calculateClosedFromGeneralSolution(generalSolution, ctx)
+        else:
+            solved = self._solveNonHomogeneous(generalSolution, ctx)
+
+        return solved
 
     def solve(self):
         """
@@ -293,9 +327,6 @@ class RecurrenceRelation(object):
         # Start solving from the next value that is not allready solved
         startSolving = max(self._solvedValues) + 1
 
-        # placeholder untill we actually get the degree but this should still work
-        degree = len(self._initialConditions)
-
         # remove the s(n) from the recurrence since we are not solving equal to 0
         # but equal to s(n)
         base = self._recurrence.subs(sympy.sympify("s(n)", self._sympy_context), 0)
@@ -303,7 +334,7 @@ class RecurrenceRelation(object):
         for i in range(startSolving, n + 1):
             eq = base
             # replace all function calls to itself with calculated values
-            for j in range(1, degree + 1):
+            for j in range(1, self._degree + 1):
                 replaceFunction = sympy.sympify("s(n-%d)" % j, self._sympy_context)
                 replaceWith = self._solvedValues[i - j]
                 eq = eq.subs(replaceFunction, replaceWith)
@@ -329,9 +360,11 @@ class RecurrenceRelation(object):
         # First solve the recurrence relation into closed form
         self.solve()
 
+        print(self._closedForm)
+
         for i in range(min(self._initialConditions), upto + 1):
             iterative_result = self._calculateValueFromRecurrence(i).evalf()
-            solved_result = iterative_result
+            solved_result = self._closedForm.subs(self._sympy_context["n"], i).evalf()
             if abs(iterative_result - solved_result) >= max_deviation:
                 msg = "Verification of solved recurrence failed at n = %d, our method gave: %f while iteration gave: %f." % (i, solved_result, iterative_result) 
                 raise RecurrenceVerificationFailed(msg)

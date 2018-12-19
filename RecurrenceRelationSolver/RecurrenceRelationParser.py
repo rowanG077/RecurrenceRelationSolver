@@ -47,7 +47,6 @@ class RecurrenceRelationParser(object):
             if n.isdigit():
                 n = int(n)
 
-            # Remove the leading s defintion and the comma at the end
             parsed[n] = eq
 
         # remove the recurrence from the dictionary
