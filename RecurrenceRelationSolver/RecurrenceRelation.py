@@ -195,8 +195,27 @@ class RecurrenceRelation(object):
         solveableRecurrence = self._recurrence - sympy.sympify("s(n)", self._sympy_context)
 
         # Check if non homogenous part is exponential in n
+        guess_ctx = {
+            "n": sympy.var("n", integer = True)
+        }
         is_exponential = self._is_exponential(nonHomogenous, False)
+        guess = 0
+        if is_exponential:
+            guess_ctx["a"] = sympy.var("a")
+            guess_ctx["b"] = sympy.var("b")
+            guess_ctx["c"] = sympy.var("c")
 
+            guess = sympy.sympify("a + b**n + c", guess_ctx)
+
+
+        for i in range(0, self._degree + 1):
+            guessFilled = guess.subs(guess_ctx["n"], guess_ctx["n"] - i)
+            replaceFunction = sympy.sympify("s(n-%d)" % i, self._sympy_context).simplify()
+            solveableRecurrence = solveableRecurrence.subs(replaceFunction, guessFilled)
+            print(solveableRecurrence)
+
+        t = sympy.solve(solveableRecurrence)
+        print(t)
 
         return ""
 
