@@ -142,8 +142,8 @@ class RecurrenceRelation(object):
             equations.append(eq.subs(ctx["n"], i))
         
         # Solve the system of equation
-        solveSymbols = [ e for n, e in ctx.items() if n != "n" ]
-        solutions = linsolve(equations, solveSymbols)
+        solve_symbols = [ e for n, e in ctx.items() if n != "n" ]
+        solutions = linsolve(equations, solve_symbols)
         
         if len(solutions) == 0:
             raise RecurrenceSolveFailed("No solution to the system of equations to find the alfas could be found.")
@@ -152,7 +152,7 @@ class RecurrenceRelation(object):
 
         # fill in the solution of the system
         solved = generalSolution
-        for symbol, sub in zip(solveSymbols, list(solution)):
+        for symbol, sub in zip(solve_symbols, list(solution)):
             solved = solved.subs(symbol, sub)
 
         return solved
@@ -194,12 +194,14 @@ class RecurrenceRelation(object):
 
         solveableRecurrence = self._recurrence - sympy.sympify("s(n)", self._sympy_context)
 
-        # Check if non homogenous part is exponential in n
+        guess = 0
         guess_ctx = {
             "n": sympy.var("n", integer = True)
         }
+
+        # Check if non homogenous part is exponential in n
         is_exponential = self._is_exponential(nonHomogenous, False)
-        guess = 0
+
         if is_exponential:
             guess_ctx["a"] = sympy.var("a")
             guess_ctx["b"] = sympy.var("b")
@@ -207,17 +209,35 @@ class RecurrenceRelation(object):
 
             guess = sympy.sympify("a + b**n + c", guess_ctx)
 
-
+        solve_symbols = [ e for n, e in guess_ctx.items() if n != "n" ]
         for i in range(0, self._degree + 1):
             guessFilled = guess.subs(guess_ctx["n"], guess_ctx["n"] - i)
             replaceFunction = sympy.sympify("s(n-%d)" % i, self._sympy_context).simplify()
             solveableRecurrence = solveableRecurrence.subs(replaceFunction, guessFilled)
-            print(solveableRecurrence)
 
-        t = sympy.solve(solveableRecurrence)
-        print(t)
+        solutions = list(sympy.solve(solveableRecurrence, solve_symbols))
+        if len(solutions) == 0:
+            msg = "Couldn't solve a guess for a particular solution."
+            raise RecurrenceSolveFailed(msg)
 
-        return ""
+        solutions = list(solutions[0])
+
+        # The solution might contain free variables so we replace those with 0
+        solution_just_symbols = [s for s in solutions if s in solve_symbols]
+        for i in range(0, len(solutions)):
+            for s in solution_just_symbols:
+                solutions[i] = solutions[i].subs(s, 0)
+
+            solutions[i] = solutions[i].simplify()
+
+        # replace the solution for the guess into the solveable recurrence
+        particularSolution = solveableRecurrence
+        for symbol, sub in zip(solve_symbols, solutions):
+            particularSolution = particularSolution.subs(symbol, sub)
+
+        result = particularSolution + generalSolution
+
+        return self._calculateClosedFromGeneralSolution(result, ctx)
 
     def _analyseExpression(self):
         """
@@ -335,7 +355,7 @@ class RecurrenceRelation(object):
             solved = self._calculateClosedFromGeneralSolution(generalSolution, ctx)
         else:
             solved = self._solveNonHomogeneous(realRoots, homogenous, nonHomogenous, generalSolution, ctx)
-
+        
         return solved
 
     def solve(self):
