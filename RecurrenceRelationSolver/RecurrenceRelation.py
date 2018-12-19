@@ -94,26 +94,16 @@ class RecurrenceRelation(object):
 
         return re.sub("\*\*", "^", raw)
 
-    def _getGeneralSolution(self, characteristicEq):
+    def _getGeneralSolution(self, realRoots):
         """
         get the general solution given the characteristic equation.
 
         Args:
-            characteristicEq (sympy expression): The characteristic equation
+            realRoots (dict of sympy expr: int): The roots of the characteristic equation with multiplicities
         
         Returns:
             sympy expression: The general solution
         """
-
-        # get roots of characteristic equations and remove
-        # the complex roots
-        realRoots = { s:m for (s,m) in sympy.roots(characteristicEq).items() if sympy.I not in s.atoms() }
-        # the sum of the multiplicity must be the same as the degree
-        # else we can't solve the equation 
-
-        if sum(realRoots.values()) != self._degree:
-            msg = "The characteristic equation \"%s\" has the following real roots: %s, and the multiplicities is not the same as the degree" % (str(characteristicEq), str(realRoots))
-            raise RecurrenceSolveFailed(msg)
 
         ctx = {
             "n": sympy.var("n", integer = True)
@@ -167,21 +157,26 @@ class RecurrenceRelation(object):
 
         return solved
 
-    def _solveNonHomogeneous(self, generalSolution, ctx):
+    def _solveNonHomogeneous(self, realRoots, homogeneous, nonHomogeneous, generalSolution, ctx):
         """
         get the closed form equation for a non-homogeneous recurrence relation
         given the general solution for the associated homogeneous recurrence
 
         Args:
+            realRoots (dict of sympy expr: int): The roots of the characteristic equation with multiplicities
+            homogeneous (sympy expression): The associated homogenous equation
+            nonHomogeneous (sympy expression): The part of the equation that makes the recurrence non homogenous
             generalSolution (sympy expression): The general solution for the associated homogeneous recurrence
-            ctx ((dict of string: sympy symbol):): The context of the general solution
+            ctx (dict of string: sympy symbol): The context of the general solution
         
         Returns:
             sympy expression: The closed form solved
         """
 
         solveableRecurrence = self._recurrence - sympy.sympify("s(n)", self._sympy_context)
+
         # Guess an equation
+
 
         particularSolution = sympy.solve(solveableRecurrence)
         solution = particularSolution + generalSolution
@@ -286,13 +281,24 @@ class RecurrenceRelation(object):
             raise RecurrenceSolveFailed("The equation is not linear")
 
         characteristicEq = self._getCharacteristicEquation(homogenous)
-        generalSolution, ctx = self._getGeneralSolution(characteristicEq)
+       
+        # get roots of characteristic equations and remove
+        # the complex roots
+        realRoots = { s:m for (s,m) in sympy.roots(characteristicEq).items() if sympy.I not in s.atoms() }
+        # the sum of the multiplicity must be the same as the degree
+        # else we can't solve the equation 
+
+        if sum(realRoots.values()) != self._degree:
+            msg = "The characteristic equation \"%s\" has the following real roots: %s, and the multiplicities is not the same as the degree" % (str(characteristicEq), str(realRoots))
+            raise RecurrenceSolveFailed(msg)
+
+        generalSolution, ctx = self._getGeneralSolution(realRoots)
 
         solved = sympy.sympify("0")
         if nonHomogenous == 0:
             solved = self._calculateClosedFromGeneralSolution(generalSolution, ctx)
         else:
-            solved = self._solveNonHomogeneous(generalSolution, ctx)
+            solved = self._solveNonHomogeneous(realRoots, homogenous, nonHomogeneous, generalSolution, ctx)
 
         return solved
 
