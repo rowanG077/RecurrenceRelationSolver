@@ -129,7 +129,7 @@ class RecurrenceRelation(object):
 
         Args:
             generalSolution (sympy expression): The general solution
-            ctx ((dict of string: sympy symbol):): The context of the general solution
+            ctx (dict of string: sympy symbol): The context of the general solution
         
         Returns:
             sympy expression: The closed form solved
@@ -156,6 +156,25 @@ class RecurrenceRelation(object):
             solved = solved.subs(symbol, sub)
 
         return solved
+    
+    def _is_exponential(self, expr, withinExponent):
+        """
+        Return whether the given expression is exponential in n
+
+        Args:
+            expr (sympy expression): The expression to test 
+            withinExponent bool: Whether we are allready in an exponent
+        
+        Returns:
+            bool: True if the expression is exponential else False
+        """
+        if withinExponent and self._sympy_context["n"] in expr.atoms():
+            return True
+
+        if sympy.Pow == expr.func:
+            return self._is_exponential(expr.args[1], True)
+
+        return any([self._is_exponential(a, withinExponent) for a in expr.args])
 
     def _solveNonHomogeneous(self, realRoots, homogeneous, nonHomogenous, generalSolution, ctx):
         """
@@ -175,13 +194,11 @@ class RecurrenceRelation(object):
 
         solveableRecurrence = self._recurrence - sympy.sympify("s(n)", self._sympy_context)
 
-        # Guess an equation
+        # Check if non homogenous part is exponential in n
+        is_exponential = self._is_exponential(nonHomogenous, False)
 
 
-        particularSolution = sympy.solve(solveableRecurrence)
-        solution = particularSolution + generalSolution
-
-        return self._calculateClosedFromGeneralSolution(solution, ctx)
+        return ""
 
     def _analyseExpression(self):
         """
@@ -365,8 +382,6 @@ class RecurrenceRelation(object):
 
         # First solve the recurrence relation into closed form
         self.solve()
-
-        print(self._closedForm)
 
         for i in range(min(self._initialConditions), upto + 1):
             iterative_result = self._calculateValueFromRecurrence(i).evalf()
