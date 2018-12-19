@@ -157,7 +157,7 @@ class RecurrenceRelation(object):
 
         return solved
 
-    def _solveNonHomogeneous(self, realRoots, homogeneous, nonHomogeneous, generalSolution, ctx):
+    def _solveNonHomogeneous(self, realRoots, homogeneous, nonHomogenous, generalSolution, ctx):
         """
         get the closed form equation for a non-homogeneous recurrence relation
         given the general solution for the associated homogeneous recurrence
@@ -165,7 +165,7 @@ class RecurrenceRelation(object):
         Args:
             realRoots (dict of sympy expr: int): The roots of the characteristic equation with multiplicities
             homogeneous (sympy expression): The associated homogenous equation
-            nonHomogeneous (sympy expression): The part of the equation that makes the recurrence non homogenous
+            nonHomogenous (sympy expression): The part of the equation that makes the recurrence non homogenous
             generalSolution (sympy expression): The general solution for the associated homogeneous recurrence
             ctx (dict of string: sympy symbol): The context of the general solution
         
@@ -298,7 +298,7 @@ class RecurrenceRelation(object):
         if nonHomogenous == 0:
             solved = self._calculateClosedFromGeneralSolution(generalSolution, ctx)
         else:
-            solved = self._solveNonHomogeneous(realRoots, homogenous, nonHomogeneous, generalSolution, ctx)
+            solved = self._solveNonHomogeneous(realRoots, homogenous, nonHomogenous, generalSolution, ctx)
 
         return solved
 
