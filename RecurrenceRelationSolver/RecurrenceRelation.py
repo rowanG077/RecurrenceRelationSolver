@@ -96,7 +96,7 @@ class RecurrenceRelation(object):
 
     def _getGeneralSolution(self, realRoots):
         """
-        get the general solution given the characteristic equation.
+        get the general solution given the roots of the characteristic equation.
 
         Args:
             realRoots (dict of sympy expr: int): The roots of the characteristic equation with multiplicities
@@ -114,7 +114,7 @@ class RecurrenceRelation(object):
         for i, (s,m) in enumerate(realRoots.items()):
             terms = []
             for j in range(0, m):
-                varname = "p%d%d" % (i,j)
+                varname = "p_%d_%d" % (i,j)
                 ctx[varname] = sympy.var(varname)
                 terms.append("(%s * n**%d)" % (varname, j))
 
@@ -156,25 +156,90 @@ class RecurrenceRelation(object):
             solved = solved.subs(symbol, sub)
 
         return solved
-    
-    def _is_exponential(self, expr, withinExponent):
+
+    def _theorem6Classifier(self, expr, ctx, buckets):
         """
-        Return whether the given expression is exponential in n
+        Classify a single term in the non homogenous part of a recurrence relation.
+        Classification means that that the term will be decomposed into the constant
+        part, a part with a constant to the power of n and n to the power of a constant.
+        
 
         Args:
-            expr (sympy expression): The expression to test 
-            withinExponent bool: Whether we are allready in an exponent
+            expr (sympy expression): The term to classify
+            ctx (dict of string: sympy symbol): The context of the solutionof
+            buckets (dict of sympy expression: dict of sympy expression: sympy symbol): Contains the classified terms
+                                               in the form (the constant to the power n) ->
+                                               (n to the power of a constant) -> (constant)
         
         Returns:
-            bool: True if the expression is exponential else False
+            sympy expression: The form of the particular solution
         """
-        if withinExponent and self._sympy_context["n"] in expr.atoms():
-            return True
 
-        if sympy.Pow == expr.func:
-            return self._is_exponential(expr.args[1], True)
+        args = expr.args
 
-        return any([self._is_exponential(a, withinExponent) for a in expr.args])
+        if expr.func != sympy.Mul:
+            args = [expr]
+        
+        power = sympy.sympify("1^n", ctx)
+        constant = sympy.sympify("1", ctx)
+        poly = sympy.sympify("0", ctx)
+
+        for a in args:
+            if ctx["n"] not in a.atoms():
+                constant = a
+            elif a.func == sympy.Symbol:
+                poly = sympy.sympify("1", ctx)
+            elif a.func == sympy.Pow and a.args[0].func == sympy.Symbol:
+                poly = a.args[1]
+            elif a.func == sympy.Pow and a.args[1].func == sympy.Symbol:
+                power = a.args[0]
+
+        if power not in buckets:
+            buckets[power] = {}
+
+        buckets[power][poly] = constant
+
+    def _theorem6SolutionBuilder(self, realroots, nonHomogenous, ctx):
+        """
+        Given the roots of the associated homogenous recurrence relation and the non homogenous part F(n)
+        of the equation build a particular solution of the correct form.
+
+        Args:
+            realRoots (dict of sympy expr: int): The roots of the characteristic equation with multiplicities
+            nonHomogenous (sympy expression): The part of the equation that makes the recurrence non homogenous
+            ctx (dict of string: sympy symbol): The context of the solution to build
+        
+        Returns:
+            sympy expression: The form of the particular solution
+        """
+
+        nonHomogenous = nonHomogenous.expand()
+
+        buckets = {}
+        if nonHomogenous.func != sympy.Add:
+            self._theorem6Classifier(nonHomogenous, ctx, buckets)
+        else:
+            for arg in nonHomogenous.args:
+                self._theorem6Classifier(arg, ctx, buckets)
+
+        particularSolutionTerms = []
+        for i, (power, polys) in enumerate(buckets.items()):
+            multiplicity = realroots.get(power, 0)
+            highestPoly = max(k for k, v in polys.items())
+            terms = []
+            for j in range(highestPoly, -1, -1):
+                varname = "q_%d_%d" % (i,j)
+                ctx[varname] = sympy.var(varname)
+                terms.append("(%s * n**%d)" % (varname, j))
+
+            particularSolutionTerms.append("n^(%s)*(%s)*(%s)^n" % (str(multiplicity), "+".join(terms), str(power)))
+
+        solutionOfCorrectForm = '+'.join(particularSolutionTerms)
+
+        logging.info("Buckets from theorem6 classifier: %s" % str(buckets))
+        logging.info("Solution must exist of form: %s" % solutionOfCorrectForm)
+
+        return sympy.sympify(solutionOfCorrectForm, ctx)
 
     def _solveNonHomogeneous(self, realRoots, homogeneous, nonHomogenous, generalSolution, ctx):
         """
@@ -194,50 +259,57 @@ class RecurrenceRelation(object):
 
         solveableRecurrence = self._recurrence - sympy.sympify("s(n)", self._sympy_context)
 
-        guess = 0
-        guess_ctx = {
+        logging.info("Brought all s(n) to one side for solving: %s" % str(solveableRecurrence))
+
+        particularCtx = {
             "n": sympy.var("n", integer = True)
         }
 
-        # Check if non homogenous part is exponential in n
-        is_exponential = self._is_exponential(nonHomogenous, False)
+        particularSolutionForm = self._theorem6SolutionBuilder(realRoots, nonHomogenous, particularCtx)
 
-        if is_exponential:
-            guess_ctx["a"] = sympy.var("a")
-            guess_ctx["b"] = sympy.var("b")
-            guess_ctx["c"] = sympy.var("c")
+        logging.info("Particular solution is of form: %s" % str(particularSolutionForm))
 
-            guess = sympy.sympify("a + b**n + c", guess_ctx)
-
-        solve_symbols = [ e for n, e in guess_ctx.items() if n != "n" ]
         for i in range(0, self._degree + 1):
-            guessFilled = guess.subs(guess_ctx["n"], guess_ctx["n"] - i)
+            particularReplaced = particularSolutionForm.subs(particularCtx["n"], particularCtx["n"] - i)
             replaceFunction = sympy.sympify("s(n-%d)" % i, self._sympy_context).simplify()
-            solveableRecurrence = solveableRecurrence.subs(replaceFunction, guessFilled)
+            solveableRecurrence = solveableRecurrence.subs(replaceFunction, particularReplaced)
 
-        solutions = list(sympy.solve(solveableRecurrence, solve_symbols))
+        logging.info("Substituted the particular solution with the correct form into the recurrence: %s" % str(solveableRecurrence))
+
+        solve_symbols = [ e for n, e in particularCtx.items() if n != "n" ]
+        solutions = sympy.solve(solveableRecurrence, solve_symbols, dict = True)
         if len(solutions) == 0:
-            msg = "Couldn't solve a guess for a particular solution."
+            msg = "Couldn't solve result of theorem6 to obtain a particular solution."
             raise RecurrenceSolveFailed(msg)
 
-        solutions = list(solutions[0])
+        variables = solutions[0]
 
-        # The solution might contain free variables so we replace those with 0
-        solution_just_symbols = [s for s in solutions if s in solve_symbols]
-        for i in range(0, len(solutions)):
-            for s in solution_just_symbols:
-                solutions[i] = solutions[i].subs(s, 0)
+        logging.info("Solved for the variables: %s" % str(variables))
 
-            solutions[i] = solutions[i].simplify()
+        # if the length of the solutions does not match the length of the solve_symbols
+        # that means we have free variables. So we fill the free variables in with 0 here
+        for s in solve_symbols:
+            if s not in variables:
+                variables[s] = sympy.sympify("0", particularCtx)
+                for k,v in variables.items():
+                    variables[k] = variables[k].subs(s, variables[s]).simplify()
 
-        # replace the solution for the guess into the solveable recurrence
-        particularSolution = solveableRecurrence
-        for symbol, sub in zip(solve_symbols, solutions):
-            particularSolution = particularSolution.subs(symbol, sub)
+        logging.info("Filled in any free variables as 0: %s" % str(variables))
 
-        result = particularSolution + generalSolution
+        # Fill in the variables into the guess
+        particularSolution = particularSolutionForm
+        for varname, value in variables.items():
+            particularSolution = particularSolution.subs(varname, value)
 
-        return self._calculateClosedFromGeneralSolution(result, ctx)
+        logging.info("Particular solution filled in with solved variables: %s" % str(particularSolution))
+
+        generalSolution = (particularSolution + generalSolution).simplify()
+
+        logging.info("Particular solution + general solution: %s" % str(generalSolution))
+
+        solved = self._calculateClosedFromGeneralSolution(generalSolution, ctx)
+
+        return solved
 
     def _analyseExpression(self):
         """
@@ -331,24 +403,35 @@ class RecurrenceRelation(object):
         Returns:
             String: The solved recurrence relation in string format
         """
+
+        logging.info("Started solving recurrence relation: %s" % str(self._recurrence))
+
         self._degree, homogenous, nonHomogenous, linear = self._analyseExpression()
+
+        msg = "homogenous" if nonHomogenous == 0 else "nonhomogenous"
+        logging.info("Analyzation complete, It is a %s recurrence relation with degree %d" % (msg, self._degree))
+        if nonHomogenous != 0:
+            logging.info("The part that makes the recurrence nonhomogenous is: %s" % str(nonHomogenous))
 
         if not linear:
             raise RecurrenceSolveFailed("The equation is not linear")
 
         characteristicEq = self._getCharacteristicEquation(homogenous)
+        logging.info("The characteristic equation is: %s" % str(characteristicEq))
        
         # get roots of characteristic equations and remove
         # the complex roots
         realRoots = { s:m for (s,m) in sympy.roots(characteristicEq).items() if sympy.I not in s.atoms() }
+        logging.info("With roots -> multiplicities: %s" % str(realRoots))
+
         # the sum of the multiplicity must be the same as the degree
         # else we can't solve the equation 
-
         if sum(realRoots.values()) != self._degree:
             msg = "The characteristic equation \"%s\" has the following real roots: %s, and the multiplicities is not the same as the degree" % (str(characteristicEq), str(realRoots))
             raise RecurrenceSolveFailed(msg)
 
         generalSolution, ctx = self._getGeneralSolution(realRoots)
+        logging.info("The general solution has the form: %s" % str(generalSolution))
 
         solved = sympy.sympify("0")
         if nonHomogenous == 0:
@@ -356,6 +439,8 @@ class RecurrenceRelation(object):
         else:
             solved = self._solveNonHomogeneous(realRoots, homogenous, nonHomogenous, generalSolution, ctx)
         
+        logging.info("Solved: %s" % str(solved.simplify()))
+
         return solved
 
     def solve(self):
@@ -370,7 +455,21 @@ class RecurrenceRelation(object):
 
         return self._from_sympy(self._closedForm)
 
-    def _calculateValueFromRecurrence(self, n):
+    def calculateValueFromSolved(self, n):
+        """
+        Get the nth value from the solved recurrence relation
+
+        Args:
+            n (int): The nth value to calculate
+        
+        Returns:
+            float: The result
+        """
+        self.solve()
+        return self._closedForm.subs(self._sympy_context["n"], n).evalf()
+
+
+    def calculateValueFromRecurrence(self, n):
         """
         Get the nth value from the recurrence relation without solving it
 
@@ -378,13 +477,12 @@ class RecurrenceRelation(object):
             n (int): The nth value to calculate
         
         Returns:
-            sympy expression: The result
-
+            float: The result
         """
 
         # Check if allready solved
         if n in self._solvedValues:
-            return self._solvedValues[n]
+            return self._solvedValues[n].evalf()
 
         # Start solving from the next value that is not allready solved
         startSolving = max(self._solvedValues) + 1
@@ -404,27 +502,5 @@ class RecurrenceRelation(object):
             # replace n with the current iteration, simplify the result and store it
             self._solvedValues[i] = eq.subs(self._sympy_context["n"], i).simplify()
 
-        return self._solvedValues[n]
+        return self._solvedValues[n].evalf()
 
-
-    def verify_range(self, upto, max_deviation):
-        """
-        Verify the solved recurrence relation with builtin sympy rsolve
-        under the range [a,b]. If the difference for each value in
-        the given range is larger then deviation an exception will
-        be thrown giving the failed iteration.
-
-        Args:
-            upto (int): Upto what index to verify the solved formula with the recurrence
-            max_deviation (float): What deviation to allow between the two solution and still be considered correct
-        """
-
-        # First solve the recurrence relation into closed form
-        self.solve()
-
-        for i in range(min(self._initialConditions), upto + 1):
-            iterative_result = self._calculateValueFromRecurrence(i).evalf()
-            solved_result = self._closedForm.subs(self._sympy_context["n"], i).evalf()
-            if abs(iterative_result - solved_result) >= max_deviation:
-                msg = "Verification of solved recurrence failed at n = %d, our method gave: %f while iteration gave: %f." % (i, solved_result, iterative_result) 
-                raise RecurrenceVerificationFailed(msg)

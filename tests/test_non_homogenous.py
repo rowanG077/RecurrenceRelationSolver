@@ -2,15 +2,12 @@
 
 from .context import RecurrenceRelationParser
 
+from .RecurrenceTestSuite import RecurrenceTestSuite
+
 import unittest
 
-class NonHomogeneousTestSuite(unittest.TestCase):
+class NonHomogeneousTestSuite(RecurrenceTestSuite):
     """Test cases for non homogeneous recurrence relations"""
-
-    def setUp(self):
-        self.parser = RecurrenceRelationParser()
-        self.verifyUpto = 50
-        self.deviation = 1.0 / 100.0
 
     def test_comass16(self):
         recurrence = """
@@ -23,8 +20,7 @@ class NonHomogeneousTestSuite(unittest.TestCase):
             s(3) = 3
             ];
         """
-        relation = self.parser.parse_recurrence(recurrence)
-        relation.verify_range(self.verifyUpto, self.deviation)
+        self.verify_range(self.parser.parse_recurrence(recurrence))
 
     def test_comass33(self):
         recurrence = """
@@ -38,8 +34,7 @@ class NonHomogeneousTestSuite(unittest.TestCase):
             s(4) = 3
             ];
         """
-        relation = self.parser.parse_recurrence(recurrence)
-        relation.verify_range(self.verifyUpto, self.deviation)
+        self.verify_range(self.parser.parse_recurrence(recurrence))
     
     def test_comass36(self):
         recurrence = """
@@ -52,22 +47,18 @@ class NonHomogeneousTestSuite(unittest.TestCase):
             s(3) = 1
             ];
         """
-        relation = self.parser.parse_recurrence(recurrence)
-        relation.verify_range(self.verifyUpto, self.deviation)
+        self.verify_range(self.parser.parse_recurrence(recurrence))
 
-    def test_Wim(self):
-            recurrence = """
-                eqs :=
-                [
-                s(n) = s(n-2) + 0.5*n^2+0.5*n,
-                s(0) = 0,
-                s(1) = 1
-                ];
-            """
-            relation = self.parser.parse_recurrence(recurrence)
-            relation.verify_range(self.verifyUpto, self.deviation)
-
-
+    def test_week7_exercise6(self):
+        recurrence = """
+            eqs :=
+            [
+            s(n) = -5*s(n-1) - 6*s(n-2) + 42 * 4^n,
+            s(0) = 56,
+            s(1) = 278
+            ];
+        """
+        self.verify_range(self.parser.parse_recurrence(recurrence))
 
 
 if __name__ == '__main__':

@@ -2,16 +2,13 @@
 
 from .context import RecurrenceRelation, RecurrenceRelationParser
 
+from .RecurrenceTestSuite import RecurrenceTestSuite
+
 import unittest
 
 
-class HomogeneousTestSuite(unittest.TestCase):
+class HomogeneousTestSuite(RecurrenceTestSuite):
     """Test cases for homogeneous recurrence relations"""
-
-    def setUp(self):
-        self.parser = RecurrenceRelationParser()
-        self.verifyUpto = 50
-        self.deviation = 1.0 / 100.0
 
     def test_comass03(self):
         recurrence = """
@@ -22,8 +19,8 @@ class HomogeneousTestSuite(unittest.TestCase):
             s(1) = 8
             ];
         """
-        relation = self.parser.parse_recurrence(recurrence)
-        relation.verify_range(self.verifyUpto, self.deviation)
+
+        self.verify_range(self.parser.parse_recurrence(recurrence))
 
     def test_comass07(self):
         recurrence = """
@@ -34,8 +31,7 @@ class HomogeneousTestSuite(unittest.TestCase):
             s(1) = 1
             ];
         """
-        relation = self.parser.parse_recurrence(recurrence)
-        relation.verify_range(self.verifyUpto, self.deviation)
+        self.verify_range(self.parser.parse_recurrence(recurrence))
 
 
 if __name__ == '__main__':
