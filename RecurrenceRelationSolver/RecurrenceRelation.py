@@ -92,6 +92,26 @@ class RecurrenceRelation(object):
 
         return re.sub("\*\*", "^", raw)
 
+    def _set_free_variables_to_zero(self, solution):
+        """
+        Given a sympy solution with multiple solution fill out any free variables as 0.
+
+        Args:
+            solution (dict of sympy symbol: sympy expression): The solution for each symbol
+                                                               where free variables have been
+                                                               eliminated
+        """
+
+        # some symbols might not be in the solutions itself so add them here
+        newSolution = { a:solution[a] if a in solution else a for sym, sol in solution.items() for a in sol.atoms(sympy.Symbol) }
+        newSolution.update(solution)
+
+        # Find all free variables and create a dict so we can easily replace them
+        replaceDict = { sym:0 for sym, sol in newSolution.items() if sym == sol }
+
+        return { symbol: expr.subs(replaceDict) for symbol, expr in newSolution.items() }
+
+
     def _getGeneralSolution(self, realRoots):
         """
         get the general solution given the roots of the characteristic equation.
@@ -104,7 +124,7 @@ class RecurrenceRelation(object):
         """
 
         ctx = {
-            "n": sympy.var("n", integer = True)
+            "n": self._sympy_context["n"]
         }
 
         # Generate general solution
@@ -114,12 +134,12 @@ class RecurrenceRelation(object):
             for j in range(0, m):
                 varname = "p_%d_%d" % (i,j)
                 ctx[varname] = sympy.var(varname)
-                terms.append("%s * n**%d" % (varname, j))
+                terms.append("%s * n^%d" % (varname, j))
 
-            generalSolutionTerms.append("(%s)*(%s)**n" % ("+".join(terms), str(s)))
+            generalSolutionTerms.append("(%s)*(%s)^n" % (" + ".join(terms), str(s)))
 
 
-        return sympy.sympify('+'.join(generalSolutionTerms), ctx), ctx
+        return sympy.sympify(' + '.join(generalSolutionTerms), ctx), ctx
 
     def _calculateClosedFromGeneralSolution(self, generalSolution, ctx):
         """
@@ -138,20 +158,31 @@ class RecurrenceRelation(object):
         for i,c in self._initialConditions.items():
             eq = generalSolution - sympy.sympify("(%s)" % str(c))
             equations.append(eq.subs(ctx["n"], i))
+
+        logging.info("Solving the system of linear equations:")
+        for e in equations:
+            logging.info("\t%s" % str(e))
         
         # Solve the system of equation
         solve_symbols = [ e for n, e in ctx.items() if n != "n" ]
         solutions = linsolve(equations, solve_symbols)
-        
+
         if len(solutions) == 0:
             raise RecurrenceSolveFailed("No solution to the system of equations to find the alfas could be found.")
 
-        solution = list(solutions)[0]
+        logging.info("Raw solutions with possibly free variables: %s" % str(solutions))
+
+        # linsolve returns a set so we translate it to a dict for the _set_free_variables_to_zero function
+        solution = { symbol:sol for symbol, sol in zip(solve_symbols, list(list(solutions)[0])) }
+
+        logging.info("Dict solution with possibly free variables: %s" % str(solution))
+
+        solution = self._set_free_variables_to_zero(solution)
+
+        logging.info("Dict solution with possibly no free variables: %s" % str(solution))
 
         # fill in the solution of the system
-        solved = generalSolution
-        for symbol, sub in zip(solve_symbols, list(solution)):
-            solved = solved.subs(symbol, sub)
+        solved = generalSolution.subs(solution)
 
         return solved
 
@@ -230,7 +261,7 @@ class RecurrenceRelation(object):
                 ctx[varname] = sympy.var(varname)
                 terms.append("%s * n**%d" % (varname, j))
 
-            particularSolutionTerms.append("n^%s*(%s)*(%s)^n" % (str(multiplicity), "+".join(terms), str(power)))
+            particularSolutionTerms.append("n^%s*(%s)*(%s)^n" % (str(multiplicity), " + ".join(terms), str(power)))
 
         solutionOfCorrectForm = '+'.join(particularSolutionTerms)
 
@@ -260,7 +291,7 @@ class RecurrenceRelation(object):
         logging.info("Brought all s(n) to one side for solving: %s" % str(solveableRecurrence))
 
         particularCtx = {
-            "n": sympy.var("n", integer = True)
+            "n": ctx["n"]
         }
 
         particularSolutionForm = self._theorem6SolutionBuilder(realRoots, nonHomogenous, particularCtx)
@@ -280,17 +311,15 @@ class RecurrenceRelation(object):
             msg = "Couldn't solve result of theorem6 to obtain a particular solution."
             raise RecurrenceSolveFailed(msg)
 
+        logging.info("All solutions solved for the variables: %s" % str(solutions))
+
         variables = solutions[0]
 
         logging.info("Solved for the variables: %s" % str(variables))
 
-        # if the length of the solutions does not match the length of the solve_symbols
-        # that means we have free variables. So we fill the free variables in with 0 here
-        for s in solve_symbols:
-            if s not in variables:
-                variables[s] = sympy.sympify("0", particularCtx)
-                for k,v in variables.items():
-                    variables[k] = variables[k].subs(s, variables[s]).simplify()
+        # All solutions should not have any variables here any more if they have it means
+        # the variable is free o we fill the free variables in with 0 here
+        variables = self._set_free_variables_to_zero(variables)
 
         logging.info("Filled in any free variables as 0: %s" % str(variables))
 
@@ -464,7 +493,7 @@ class RecurrenceRelation(object):
             float: The result
         """
         self.solve()
-        return self._closedForm.subs(self._sympy_context["n"], n).evalf()
+        return self._closedForm.subs(self._sympy_context["n"], n).evalf(100)
 
 
     def calculateValueFromRecurrence(self, n):
@@ -500,5 +529,5 @@ class RecurrenceRelation(object):
             # replace n with the current iteration, simplify the result and store it
             self._solvedValues[i] = eq.subs(self._sympy_context["n"], i).simplify()
 
-        return self._solvedValues[n].evalf()
+        return self._solvedValues[n].evalf(100)
 
