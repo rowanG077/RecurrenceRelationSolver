@@ -76,9 +76,8 @@ class RecurrenceRelation(object):
         Returns:
             string: The sympy expression stringified
         """
-        expressionString = str(expr)
 
-        expressionString = re.sub(r"\*\*", "^", expressionString)
+        expressionString = re.sub(r"\*\*", "^", str(expr))
 
         i = expressionString.find("sqrt")
         while i != -1:
