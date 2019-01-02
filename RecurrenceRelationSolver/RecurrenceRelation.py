@@ -5,19 +5,6 @@ import re
 import sympy
 from sympy.solvers.solveset import linsolve
 
-class RecurrenceVerificationFailed(Exception):
-    """
-    RecurrenceVerificationFailed will be thrown when verification fails with builtin
-    sympy method.
-    """
-    def __init__(self, reason):
-        """
-        create RecurrenceVerificationFailed object
-        Args:
-            reason (string): Where the verification failed
-        """
-        self.reason = reason
-
 class RecurrenceSolveFailed(Exception):
     """
     RecurrenceSolveFailed will be thrown when recurrence relation couldn't be solved fails
@@ -79,8 +66,9 @@ class RecurrenceRelation(object):
 
     def _from_sympy(self, expr):
         """
-        sympy represents powers not with ^ but with **.
-        Translate from sympy representation to string representation here
+        sympy represents square roots as sqrt() but we require it to be ^(1/2)
+        also powers are represented as ** by sympy but we need to have ^.
+        This function takes a sympy expression and returns the appropiate string.
         
         Args:
             expr (sympy expression): string of an expression in sympy format
@@ -88,9 +76,47 @@ class RecurrenceRelation(object):
         Returns:
             string: The sympy expression stringified
         """
-        raw = str(expr)
+        expressionString = str(expr)
 
-        return re.sub("\*\*", "^", raw)
+        expressionString = re.sub("\*\*", "^", expressionString)
+
+        i = expressionString.find("sqrt")
+        while i != -1:
+            nestCount = 0
+            endSqrtIndex = -1
+            for j in range(i, len(expressionString)):
+                if expressionString[j] == '(':
+                    nestCount += 1
+                elif expressionString[j] == ')':
+                    if nestCount == 1:
+                        endSqrtIndex = j + 1
+                        break
+                    nestCount -= 1
+
+            sqrtExpr = expressionString[i+4:endSqrtIndex].strip()
+
+            expressionString = "%s(%s^(1/2))%s" % (expressionString[0:i], sqrtExpr, expressionString[endSqrtIndex:])
+            i = expressionString.find("sqrt")
+        
+        return expressionString
+
+    def getRecurrence(self):
+        """
+        Get the recurrence
+
+        Returns:
+            string: The recurrence
+        """
+        return self._from_sympy(self._recurrence)
+
+    def getLowerBoundDomain(self):
+        """
+        get the low bound where the recurrence is defined
+
+        Returns:
+            int: The start where the recurrence is defined
+        """
+        return min([int(k) for k,v in self._initialConditions.items()])
 
     def _set_free_variables_to_zero(self, solution):
         """
@@ -134,9 +160,9 @@ class RecurrenceRelation(object):
             for j in range(0, m):
                 varname = "p_%d_%d" % (i,j)
                 ctx[varname] = sympy.var(varname)
-                terms.append("%s * n^%d" % (varname, j))
+                terms.append("%s * n**%d" % (varname, j))
 
-            generalSolutionTerms.append("(%s)*(%s)^n" % (" + ".join(terms), str(s)))
+            generalSolutionTerms.append("(%s)*(%s)**n" % (" + ".join(terms), str(s)))
 
 
         return sympy.sympify(' + '.join(generalSolutionTerms), ctx), ctx
@@ -261,9 +287,9 @@ class RecurrenceRelation(object):
                 ctx[varname] = sympy.var(varname)
                 terms.append("%s * n**%d" % (varname, j))
 
-            particularSolutionTerms.append("n^%s*(%s)*(%s)^n" % (str(multiplicity), " + ".join(terms), str(power)))
+            particularSolutionTerms.append("n**%s*(%s)*(%s)**n" % (str(multiplicity), " + ".join(terms), str(power)))
 
-        solutionOfCorrectForm = '+'.join(particularSolutionTerms)
+        solutionOfCorrectForm = " + ".join(particularSolutionTerms)
 
         logging.info("Buckets from theorem6 classifier: %s" % str(buckets))
         logging.info("Solution must exist of form: %s" % solutionOfCorrectForm)
@@ -318,12 +344,12 @@ class RecurrenceRelation(object):
         logging.info("Solved for the variables: %s" % str(variables))
 
         # All solutions should not have any variables here any more if they have it means
-        # the variable is free o we fill the free variables in with 0 here
+        # the variable is free so we fill the free variables in with 0 here
         variables = self._set_free_variables_to_zero(variables)
 
         logging.info("Filled in any free variables as 0: %s" % str(variables))
 
-        # Fill in the variables into the guess
+        # Fill in the variables into the particular of the correct form
         particularSolution = particularSolutionForm.subs(variables)
 
         logging.info("Particular solution filled in with solved variables: %s" % str(particularSolution))
