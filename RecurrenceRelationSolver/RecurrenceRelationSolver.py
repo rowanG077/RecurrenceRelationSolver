@@ -75,8 +75,10 @@ def main():
             solved_result = r.calculateValueFromSolved(i)
             if abs(iterative_result - solved_result) >= tolerance:
                 failed = True
-                msg = "Verification of solved recurrence failed at n = %d for relation: %s" % (i, r.getRecurrence()) 
-                logging.error(msg)
+                logging.error("Verification of solved recurrence failed at n = %d for relation: %s" % (i, r.getRecurrence()))
+                logging.error("Recurrence says: %s" % str(iterative_result))
+                logging.error("Solved says: %s" % str(solved_result))
+                logging.error("Delta: %s" % str(abs(iterative_result - solved_result)))
                 break
         
         if failed:

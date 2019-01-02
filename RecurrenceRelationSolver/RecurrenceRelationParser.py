@@ -15,7 +15,7 @@ class RecurrenceRelationParser(object):
         """
         create _RecurrenceParser object
         """
-        self._pattern = re.compile("s\((\d+|n)\)\s*=\s*?(.+)")
+        self._pattern = re.compile(r"s\((\d+|n)\)\s*=\s*?(.+)")
         self._logger = logging.getLogger(__name__)
 
     def parse_recurrence(self, data):
