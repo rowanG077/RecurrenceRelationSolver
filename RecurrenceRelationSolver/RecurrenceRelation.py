@@ -223,8 +223,8 @@ class RecurrenceRelation(object):
             expr (sympy expression): The term to classify
             ctx (dict of string: sympy symbol): The context of the solutionof
             buckets (dict of sympy expression: dict of sympy expression: sympy symbol): Contains the classified terms
-                                               in the form (the constant to the power n) ->
-                                               (n to the power of a constant) -> (constant)
+                                               in the form (the constant to the power n):
+                                               (n to the power of a constant): (constant)
         
         Returns:
             sympy expression: The form of the particular solution
@@ -474,7 +474,7 @@ class RecurrenceRelation(object):
         # get roots of characteristic equations and remove
         # the complex roots
         realRoots = { s:m for (s,m) in sympy.roots(characteristicEq).items() if sympy.I not in s.atoms() }
-        logging.info("With roots -> multiplicities: %s" % str(realRoots))
+        logging.info("With roots: multiplicities: %s" % str(realRoots))
 
         # the sum of the multiplicity must be the same as the degree
         # else we can't solve the equation 
