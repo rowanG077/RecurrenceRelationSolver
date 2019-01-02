@@ -62,8 +62,6 @@ class RecurrenceRelation(object):
         # Contains the closed from as calculated by our own algorithm
         self._closedForm = None
 
-        self._logger = logging.getLogger(__name__)
-
     def _to_sympy(self, expr):
         """
         sympy represents powers not with ^ but with **.
@@ -116,7 +114,7 @@ class RecurrenceRelation(object):
             for j in range(0, m):
                 varname = "p_%d_%d" % (i,j)
                 ctx[varname] = sympy.var(varname)
-                terms.append("(%s * n**%d)" % (varname, j))
+                terms.append("%s * n**%d" % (varname, j))
 
             generalSolutionTerms.append("(%s)*(%s)**n" % ("+".join(terms), str(s)))
 
@@ -180,7 +178,7 @@ class RecurrenceRelation(object):
         if expr.func != sympy.Mul:
             args = [expr]
         
-        power = sympy.sympify("1^n", ctx)
+        power = sympy.sympify("1", ctx)
         constant = sympy.sympify("1", ctx)
         poly = sympy.sympify("0", ctx)
 
@@ -230,9 +228,9 @@ class RecurrenceRelation(object):
             for j in range(highestPoly, -1, -1):
                 varname = "q_%d_%d" % (i,j)
                 ctx[varname] = sympy.var(varname)
-                terms.append("(%s * n**%d)" % (varname, j))
+                terms.append("%s * n**%d" % (varname, j))
 
-            particularSolutionTerms.append("n^(%s)*(%s)*(%s)^n" % (str(multiplicity), "+".join(terms), str(power)))
+            particularSolutionTerms.append("n^%s*(%s)*(%s)^n" % (str(multiplicity), "+".join(terms), str(power)))
 
         solutionOfCorrectForm = '+'.join(particularSolutionTerms)
 
