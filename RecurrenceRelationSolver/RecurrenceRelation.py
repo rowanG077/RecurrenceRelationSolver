@@ -330,6 +330,10 @@ class RecurrenceRelation(object):
 
         logging.info("Substituted the particular solution with the correct form into the recurrence: %s" % str(solveableRecurrence))
 
+        solveableRecurrence = solveableRecurrence.simplify()
+
+        logging.info("Simplified: %s" % str(solveableRecurrence))
+
         solve_symbols = [ e for n, e in particularCtx.items() if n != "n" ]
         solutions = sympy.solve(solveableRecurrence, solve_symbols, dict = True)
         if len(solutions) == 0:
@@ -490,7 +494,9 @@ class RecurrenceRelation(object):
         else:
             solved = self._solveNonHomogeneous(realRoots, homogenous, nonHomogenous, generalSolution, ctx)
         
-        logging.info("Solved: %s" % str(solved.simplify()))
+        logging.info("Solved raw: %s" % str(solved))
+        solved = solved.simplify()
+        logging.info("Solved simplified: %s" % str(solved))
 
         return solved
 
@@ -538,12 +544,8 @@ class RecurrenceRelation(object):
         # Start solving from the next value that is not allready solved
         startSolving = max(self._solvedValues) + 1
 
-        # remove the s(n) from the recurrence since we are not solving equal to 0
-        # but equal to s(n)
-        base = self._recurrence.subs(sympy.sympify("s(n)", self._sympy_context), 0)
-
         for i in range(startSolving, n + 1):
-            eq = base
+            eq = self._recurrence
             # replace all function calls to itself with calculated values
             for j in range(1, self._degree + 1):
                 replaceFunction = sympy.sympify("s(n-%d)" % j, self._sympy_context)
