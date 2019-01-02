@@ -205,7 +205,7 @@ class RecurrenceRelation(object):
 
         solution = self._set_free_variables_to_zero(solution)
 
-        logging.info("Dict solution with possibly no free variables: %s" % str(solution))
+        logging.info("Dict solution no free variables: %s" % str(solution))
 
         # fill in the solution of the system
         solved = generalSolution.subs(solution)
