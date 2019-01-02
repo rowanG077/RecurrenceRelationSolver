@@ -324,9 +324,7 @@ class RecurrenceRelation(object):
         logging.info("Filled in any free variables as 0: %s" % str(variables))
 
         # Fill in the variables into the guess
-        particularSolution = particularSolutionForm
-        for varname, value in variables.items():
-            particularSolution = particularSolution.subs(varname, value)
+        particularSolution = particularSolutionForm.subs(variables)
 
         logging.info("Particular solution filled in with solved variables: %s" % str(particularSolution))
 
