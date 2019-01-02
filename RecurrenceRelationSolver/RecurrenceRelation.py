@@ -358,6 +358,8 @@ class RecurrenceRelation(object):
         i = sympy.Wild("i")
 
         for arg in self._recurrence.args:
+            if len(self._recurrence.args) == 1:
+                arg = self._recurrence
             if arg.has(s):
                 homogenous += arg
                 rec_term = str(arg.find(s(n-i)))
@@ -377,7 +379,6 @@ class RecurrenceRelation(object):
                     raise RecurrenceSolveFailed("Failed parsing homogeneous term")
             else:
                 nonHomogenous += arg
-
         return degree, homogenous, nonHomogenous, linear
 
     def _getDirectKey(self, expr):
