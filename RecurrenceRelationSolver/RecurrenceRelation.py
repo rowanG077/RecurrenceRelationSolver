@@ -220,13 +220,10 @@ class RecurrenceRelation(object):
 
         Args:
             expr (sympy expression): The term to classify
-            ctx (dict of string: sympy symbol): The context of the solutionof
+            ctx (dict of string: sympy symbol): The context of the solution
             buckets (dict of sympy expression: dict of sympy expression: sympy symbol): Contains the classified terms
                                                in the form (the constant to the power n):
                                                (n to the power of a constant): (constant)
-        
-        Returns:
-            sympy expression: The form of the particular solution
         """
 
         args = expr.args
@@ -294,6 +291,97 @@ class RecurrenceRelation(object):
         logging.info("Solution must exist of form: %s" % solutionOfCorrectForm)
 
         return sympy.sympify(solutionOfCorrectForm, ctx)
+    
+    def _particularSolutionClassifier(self, expr, ctx, buckets):
+        """
+        Classify a single term of the recurrence relation where the particular solution has been substituted into 
+        Classification means that that the term will be decomposed into buckets of x^n that contains a list of each
+        term with the degree of that x^n.
+        
+
+        Args:
+            expr (sympy expression): The term to classify
+            ctx (dict of string: sympy symbol): The context of the solution
+            buckets (dict of sympy expression: dict of sympy expression: sympy symbol): Contains the classified terms
+        """
+        args = expr.args
+
+        if expr.func != sympy.Mul:
+            args = [expr]
+        
+        matcherCtx = { "n": ctx["n"], "i": sympy.Wild("i") }
+        matcher = sympy.sympify("n - i", matcherCtx)
+
+        base = sympy.sympify("1", ctx)
+        degree = sympy.sympify("0", ctx)
+        term = expr
+
+        for a in args:
+            if a.func == sympy.Pow and len(a.args[0].atoms(sympy.Symbol)) == 0:
+                base = a.args[0]
+                m = a.args[1].match(matcher)
+                degree = m[matcherCtx["i"]]
+                term = term.subs(a, 1) 
+                break
+
+        if base not in buckets:
+            buckets[base] = []
+
+        buckets[base].append({
+            "term": term,
+            "degree": degree
+        })
+
+    def _solveParticularCoefficients(self, expr, ctx):
+        """
+        Solve for the coefficients of the particular solution.
+
+        Args:
+            expr (sympy expression): The recurrence with the particular solution substituted into it
+            ctx (dict of string: sympy symbol): The context of the recurrence with the particular solution substituted into it
+
+        Returns:
+            (dict of sympy symbol: sympy expressiong): Dict containing values of the coefficients
+        """
+        expr = expr.expand()
+
+        # built up dict containing
+        buckets = {}
+        if expr.func != sympy.Add:
+            self._particularSolutionClassifier(expr, ctx, buckets)
+        else:
+            for arg in expr.args:
+                self._particularSolutionClassifier(arg, ctx, buckets)
+
+        logging.info("Buckets for solving coefficients of particular: ")
+        for p,b in buckets.items():
+            logging.info("\t%s: %s" % (str(p), str(b)))
+
+        eqs = []
+        for p,b in buckets.items():
+            highestDegree = max([t["degree"] for t in b ])
+            eq = 0
+            for t in b:
+                degreeDiff = highestDegree - t["degree"]
+                eq = eq + p**degreeDiff * (t["term"])
+
+            eqs.append(eq)
+
+        logging.info("Each of the following equations has to be 0")
+        for eq in eqs:
+            logging.info("\t%s" % str(eq))
+
+        # start solving that shit
+        result = {}
+        for eq in eqs:
+            solveSymbols = [ s for s in eq.atoms(sympy.Symbol) if s != ctx["n"] ]
+            res = sympy.solve_undetermined_coeffs(eq, solveSymbols, ctx["n"])
+            if res is None:
+                raise RecurrenceSolveFailed("Could not solve one of the sub equations of the filled in recurrence with the particular solution.")
+                
+            result.update(res)
+
+        return result
 
     def _solveNonHomogeneous(self, realRoots, homogeneous, nonHomogenous, generalSolution, ctx):
         """
@@ -330,28 +418,21 @@ class RecurrenceRelation(object):
 
         logging.info("Substituted the particular solution with the correct form into the recurrence: %s" % str(solveableRecurrence))
 
-        solveableRecurrence = solveableRecurrence.simplify()
+        # we replace every x^n with a positive constant so we can use some more sympy facilities.
 
-        logging.info("Simplified: %s" % str(solveableRecurrence))
+        solution = self._solveParticularCoefficients(solveableRecurrence, particularCtx)
 
-        solve_symbols = [ e for n, e in particularCtx.items() if n != "n" ]
-        solutions = sympy.solve(solveableRecurrence, solve_symbols, dict = True)
-        if len(solutions) == 0:
-            msg = "Couldn't solve result of theorem6 to obtain a particular solution."
-            raise RecurrenceSolveFailed(msg)
-
-        logging.info("All solutions solved for the variables: %s" % str(solutions))
-
-        variables = solutions[0]
-
-        logging.info("Solved for the variables: %s" % str(variables))
+        logging.info("Solved for the variables: %s" % str(solution))
 
         # All solutions should not have any variables here any more if they have it means
         # the variable is free so we fill the free variables in with 0 here
-        variables = self._set_free_variables_to_zero(variables)
+        variables = self._set_free_variables_to_zero(solution)
 
         logging.info("Filled in any free variables as 0: %s" % str(variables))
 
+        if solveableRecurrence.subs(variables).simplify() != 0:
+            raise RecurrenceSolveFailed("Filling in solved coefficient for the recurrence where the particular solution has been fillled doesn't lead to a correct equation.")
+ 
         # Fill in the variables into the particular of the correct form
         particularSolution = particularSolutionForm.subs(variables)
 
@@ -437,6 +518,9 @@ class RecurrenceRelation(object):
     def _getCharacteristicEquation(self, expr):
         """
         Get the characteristic function with a given degree
+
+        Returns:
+            Sympy expression: The characteristic equation
         """    
         r = sympy.Symbol('r')
 
