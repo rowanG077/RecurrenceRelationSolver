@@ -76,6 +76,18 @@ class HomogeneousTestSuite(RecurrenceTestSuite):
         """
         self.verify_range(self.parser.parse_recurrence(recurrence))
 
+    def test_book_example8(self):
+        recurrence = """
+            eqs :=
+            [
+            s(n) = -3*s(n-1) - 3*s(n-2) - s(n-3),
+            s(0) = 1,
+            s(1) = -2,
+            s(2) = -1
+            ];
+        """
+        self.verify_range(self.parser.parse_recurrence(recurrence))
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -130,6 +130,17 @@ class NonHomogeneousTestSuite(RecurrenceTestSuite):
         """
         self.verify_range(self.parser.parse_recurrence(recurrence))
 
+    def test_ex24_par8_2(self):
+        recurrence = """
+            eqs :=
+            [
+            s(n) = -5*s(n-1) - 6*s(n-2) + 42 * 4^n,
+            s(1) = 56,
+            s(2) = 278
+            ];
+        """
+        self.verify_range(self.parser.parse_recurrence(recurrence))
+
 
 if __name__ == '__main__':
     unittest.main()
