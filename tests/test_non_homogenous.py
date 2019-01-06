@@ -141,6 +141,17 @@ class NonHomogeneousTestSuite(RecurrenceTestSuite):
         """
         self.verify_range(self.parser.parse_recurrence(recurrence))
 
+    def test_example11(self):
+        recurrence = """
+            eqs :=
+            [
+            s(n) = 5*s(n-1) - 6*s(n-2) + 7^n,
+            s(1) = 2,
+            s(2) = 5
+            ];
+        """
+        self.verify_range(self.parser.parse_recurrence(recurrence))
+
 
 if __name__ == '__main__':
     unittest.main()
