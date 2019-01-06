@@ -3,6 +3,7 @@
 from .context import RecurrenceRelation, RecurrenceRelationParser
 
 import unittest
+
 from nose.tools import assert_almost_equal
 
 class RecurrenceTestSuite(unittest.TestCase):

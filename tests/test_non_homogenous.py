@@ -152,6 +152,18 @@ class NonHomogeneousTestSuite(RecurrenceTestSuite):
         """
         self.verify_range(self.parser.parse_recurrence(recurrence))
 
+    def test_factorial(self):
+        recurrence = """
+            eqs :=
+            [
+            s(n) = s(n-1) + n!,
+            s(1) = 1,
+            s(2) = 2,
+            s(3) = 2
+            ];
+        """
+        self.verify_range(self.parser.parse_recurrence(recurrence))
+
 
 if __name__ == '__main__':
     unittest.main()
