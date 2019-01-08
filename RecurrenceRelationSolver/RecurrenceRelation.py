@@ -317,7 +317,7 @@ class RecurrenceRelation(object):
         term = expr
 
         for a in args:
-            if a.func == sympy.Pow and len(a.args[0].atoms(sympy.Symbol)) == 0:
+            if a.func == sympy.Pow and len(a.args[0].atoms(sympy.Symbol)) == 0 and len(a.args[1].atoms(sympy.Symbol)) > 0:
                 base = a.args[0]
                 m = a.args[1].match(matcher)
                 degree = m[matcherCtx["i"]]
@@ -344,6 +344,8 @@ class RecurrenceRelation(object):
             (dict of sympy symbol: sympy expressiong): Dict containing values of the coefficients
         """
         expr = expr.expand()
+
+        logging.info("solving particular expanded: %s" % str(expr))
 
         # built up dict containing
         buckets = {}
