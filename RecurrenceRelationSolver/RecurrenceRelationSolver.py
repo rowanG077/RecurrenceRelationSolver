@@ -60,6 +60,7 @@ def main():
 
     tolerance = 10**(-args.precision)
     for fn, r in relations.items(): 
+        print("Solving %s" % fn)
         try:
             r.solve()
         except Exception as e:
